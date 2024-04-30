@@ -8,6 +8,7 @@ import (
 
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
@@ -19,7 +20,6 @@ func convertEnvelopeToMetrics(envelope *loggregator_v2.Envelope, metricSlice pme
 	namePrefix := envelope.Tags["origin"] + "."
 
 	switch message := envelope.Message.(type) {
-	case *loggregator_v2.Envelope_Log:
 	case *loggregator_v2.Envelope_Counter:
 		metric := metricSlice.AppendEmpty()
 		metric.SetName(namePrefix + message.Counter.GetName())
@@ -38,6 +38,25 @@ func convertEnvelopeToMetrics(envelope *loggregator_v2.Envelope, metricSlice pme
 			dataPoint.SetStartTimestamp(pcommon.NewTimestampFromTime(startTime))
 			copyEnvelopeAttributes(dataPoint.Attributes(), envelope)
 		}
+	}
+}
+
+func convertEnvelopeToLogs(envelope *loggregator_v2.Envelope, logSlice plog.LogRecordSlice, startTime time.Time) {
+	switch envelope.Message.(type) {
+	case *loggregator_v2.Envelope_Log:
+
+		log := logSlice.AppendEmpty()
+		//log.SetSeverityText("INFO")
+		log.SetTimestamp(pcommon.Timestamp(envelope.GetTimestamp()))
+		log.Body().SetStr(string(envelope.GetLog().GetPayload()))
+		log.SetSeverityNumber(plog.SeverityNumber(envelope.GetLog().GetType()))
+		// TODO:
+		//log.SetObservedTimestamp(ts)
+		//log.SetSeverityText("info")
+		//log.SetSeverityNumber(plog.SeverityNumberInfo)
+		copyEnvelopeAttributes(log.Attributes(), envelope)
+	default:
+		print("wrong envelope type")
 	}
 }
 
