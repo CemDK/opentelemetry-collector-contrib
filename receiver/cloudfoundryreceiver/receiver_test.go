@@ -19,18 +19,44 @@ func TestDefaultValidReceiver(t *testing.T) {
 	cfg := factory.CreateDefaultConfig().(*Config)
 	params := receivertest.NewNopCreateSettings()
 
-	receiver, err := newCloudFoundryReceiver(
-		params,
-		*cfg,
-		consumertest.NewNop(),
-	)
+	// foreach newcloudfoundrymetricsreceiver, newcloudfoundrylogsreceiver, newcloudfoundrytracesreceiver
+	// do the testing
+	for _, createReceiverFunc := range []func() *cloudFoundryReceiver{
+		func() *cloudFoundryReceiver {
+			return newCloudFoundryMetricsReceiver(params, *cfg, consumertest.NewNop())
+		},
+		func() *cloudFoundryReceiver {
+			return newCloudFoundryLogsReceiver(params, *cfg, consumertest.NewNop())
+		},
+		func() *cloudFoundryReceiver {
+			return newCloudFoundryTracesReceiver(params, *cfg, consumertest.NewNop())
+		},
+	} {
+		receiver, err := createReceiverFunc()
+		require.NoError(t, err)
+		require.NotNil(t, receiver, "receiver creation failed")
 
-	require.NoError(t, err)
+		// Test start
+		ctx := context.Background()
+		err = receiver.Start(ctx, componenttest.NewNopHost())
+		require.NoError(t, err)
+
+		// Test shutdown
+		err = receiver.Shutdown(ctx)
+		require.NoError(t, err)
+
+	}
+}
+
+// test template, where we pass a function for creating a receiver
+func testValidReceiver(t *testing.T, createReceiverFunc func() *cloudFoundryReceiver) {
+	// Test to make sure a new receiver can be created properly, started and shutdown
+	receiver := createReceiverFunc()
 	require.NotNil(t, receiver, "receiver creation failed")
 
 	// Test start
 	ctx := context.Background()
-	err = receiver.Start(ctx, componenttest.NewNopHost())
+	err := receiver.Start(ctx, componenttest.NewNopHost())
 	require.NoError(t, err)
 
 	// Test shutdown
